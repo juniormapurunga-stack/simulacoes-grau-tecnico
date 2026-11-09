@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balanceamento das Fases</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --navy-dark:#232852; --navy-mid:#252e61; --navy-light:#293275; --acento:#4a5bbf;
+    --off:#f3f3f3; --lav:#a0a8cc; --lav-med:#7a88cc; --texto:#333; --suave:#666; --borda:#e0e0e0; --alerta:#e07a1f; --ok:#2e7d4f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--off); color:var(--texto); font-family:'Barlow','Trebuchet MS','Segoe UI',sans-serif; font-size:16px; line-height:1.5; }
+  header { background:var(--navy-dark); color:#fff; padding:20px 16px 18px; border-left:6px solid var(--acento); }
+  .eyebrow { font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--lav-med); }
+  h1 { margin:6px 0 4px; font-weight:900; font-size:clamp(24px,5vw,34px); line-height:1.1; }
+  header p { margin:0; color:var(--lav); font-weight:300; }
+  main { max-width:1100px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); }
+  @media (max-width:820px) { main { grid-template-columns:1fr; } }
+  .card { background:#fff; border-radius:6px; padding:16px; border-left:4px solid var(--navy-light); }
+  .card h2 { margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--acento); }
+  canvas { width:100%; height:auto; display:block; background:var(--off); border-radius:4px; }
+  .presets { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  button { font:inherit; font-weight:700; border-radius:4px; border:1px solid var(--navy-light); background:#fff; color:var(--navy-light); cursor:pointer; }
+  .presets button { font-size:13px; padding:6px 10px; }
+  .presets button.forte { background:var(--navy-light); color:#fff; }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  td { padding:5px 4px; border-bottom:1px solid var(--borda); }
+  td.va { text-align:right; white-space:nowrap; font-weight:600; }
+  .fase { display:inline-flex; gap:4px; }
+  .fase button { width:34px; height:32px; padding:0; }
+  .fase button.on { background:var(--navy-light); color:#fff; }
+  .novo { display:grid; grid-template-columns:1fr 90px 70px; gap:6px; margin-top:10px; }
+  .novo input { font:inherit; padding:6px; border:1px solid var(--borda); border-radius:4px; min-width:0; }
+  .estado { margin-top:12px; padding:10px 12px; border-radius:4px; font-weight:700; }
+  .estado.ok { background:#e8f5ee; color:var(--ok); border-left:4px solid var(--ok); }
+  .estado.ruim { background:#fff4e8; color:#7a3d00; border-left:4px solid var(--alerta); }
+  ol { margin:0; padding-left:20px; } li { margin-bottom:6px; }
+  footer { max-width:1100px; margin:0 auto; padding:8px 16px 24px; font-size:13px; color:var(--suave); }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Aula 02 · Projetos Elétricos de Baixa Tensão</div>
+  <h1>Balanceamento das Fases</h1>
+  <p>Escolha a fase de cada circuito (220 V fase-neutro) e veja a carga e a corrente de cada fase.</p>
+</header>
+<main>
+  <section class="card">
+    <h2>Carga por fase</h2>
+    <canvas id="tela" width="560" height="400" aria-label="Barras de potência por fase"></canvas>
+    <div class="estado" id="estado"></div>
+  </section>
+  <section class="card">
+    <h2>Circuitos</h2>
+    <div class="presets">
+      <button id="pEx">Casa do exemplo</button>
+      <button id="pExerc">Casa do exercício</button>
+      <button id="pAuto" class="forte">Distribuir automaticamente</button>
+    </div>
+    <table><tbody id="lista"></tbody></table>
+    <div class="novo">
+      <input id="nNome" placeholder="Novo circuito" aria-label="Nome do circuito">
+      <input id="nVA" type="number" min="10" step="10" placeholder="VA" aria-label="Potência em VA">
+      <button id="nAdd">Somar</button>
+    </div>
+  </section>
+  <section class="card" style="grid-column:1/-1">
+    <h2>Experimente</h2>
+    <ol>
+      <li>Carregue a casa do exemplo: as fases ficam com 6700, 7150 e 7010 VA, razão 1,07.</li>
+      <li>Passe o chuveiro social (C6) da fase A para a B. A diferença passa dos 10 % e o aviso acende.</li>
+      <li>Carregue a casa do exercício (tudo começa na fase A) e tente equilibrar à mão. Depois clique em “Distribuir automaticamente” e compare.</li>
+      <li>Some um ar-condicionado de 1650 VA. Em que fase ele cabe melhor?</li>
+    </ol>
+  </section>
+</main>
+<footer>Curso Técnico em Eletrotécnica · Prof. Me. Francisco Mapurunga de Menezes Júnior · Critério de boa prática: a fase mais carregada até 10 % acima da menos carregada.</footer>
+<script>
+// Física da simulação "Balanceamento das fases" (Aula 02).
+// Só funções puras: o teste importa daqui e o build embute no HTML.
+
+const FASES = ['A', 'B', 'C'];
+
+/** Soma de VA por fase. circuitos: [{nome, va, fase}] */
+function totais(circuitos) {
+  const t = { A: 0, B: 0, C: 0 };
+  for (const c of circuitos) if (t[c.fase] !== undefined) t[c.fase] += c.va;
+  return t;
+}
+
+/** Corrente de cada fase com cargas fase-neutro em V volts. */
+function correntes(t, V = 220) {
+  return { A: t.A / V, B: t.B / V, C: t.C / V };
+}
+
+/** Razão maior/menor (critério: até 1,10). Fase vazia dá Infinity. */
+function razao(t) {
+  const v = FASES.map((f) => t[f]);
+  const mn = Math.min(...v), mx = Math.max(...v);
+  return mn > 0 ? mx / mn : Infinity;
+}
+
+function dentroDoCriterio(t, limite = 1.1) {
+  return razao(t) <= limite + 1e-9;
+}
+
+/** Melhor distribuição por busca completa (até 12 circuitos): menor razão maior/menor. */
+function melhorDistribuicao(circuitos) {
+  const n = circuitos.length;
+  if (n > 12) throw new Error('máximo de 12 circuitos');
+  const va = circuitos.map((c) => c.va);
+  let melhor = null;
+  const fase = new Array(n).fill(0);
+  const total = 3 ** n;
+  for (let k = 0; k < total; k++) {
+    let x = k;
+    const s = [0, 0, 0];
+    for (let i = 0; i < n; i++) { fase[i] = x % 3; x = Math.floor(x / 3); s[fase[i]] += va[i]; }
+    if (fase[0] !== 0) continue; // simetria: o 1º circuito fica na fase A
+    const mn = Math.min(...s), mx = Math.max(...s);
+    const r = mn > 0 ? mx / mn : Infinity;
+    if (!melhor || r < melhor.r - 1e-12 || (Math.abs(r - melhor.r) < 1e-12 && mx < melhor.mx)) {
+      melhor = { r, mx, fases: fase.map((f) => FASES[f]) };
+    }
+  }
+  return circuitos.map((c, i) => ({ ...c, fase: melhor.fases[i] }));
+}
+
+const CASA_EXEMPLO = [
+  { nome: 'C1 Iluminação', va: 760, fase: 'C' },
+  { nome: 'C2 TUG sala e dormitórios', va: 900, fase: 'C' },
+  { nome: 'C3 TUG cozinha', va: 1900, fase: 'C' },
+  { nome: 'C4 TUG área de serviço', va: 1800, fase: 'C' },
+  { nome: 'C5 TUG banheiros', va: 1200, fase: 'A' },
+  { nome: 'C6 Chuveiro social', va: 5500, fase: 'A' },
+  { nome: 'C7 Chuveiro suíte', va: 5500, fase: 'B' },
+  { nome: 'C8 Ar-condicionado 1', va: 1650, fase: 'B' },
+  { nome: 'C9 Ar-condicionado 2', va: 1650, fase: 'C' },
+];
+
+const CASA_EXERCICIO = [
+  { nome: 'C1 Iluminação', va: 900, fase: 'A' },
+  { nome: 'C2 TUG sala e quartos', va: 1100, fase: 'A' },
+  { nome: 'C3 TUG cozinha', va: 2200, fase: 'A' },
+  { nome: 'C4 Chuveiro', va: 5500, fase: 'A' },
+  { nome: 'C5 Micro-ondas', va: 1500, fase: 'A' },
+  { nome: 'C6 Ar-condicionado 1', va: 1650, fase: 'A' },
+  { nome: 'C7 Ar-condicionado 2', va: 1650, fase: 'A' },
+  { nome: 'C8 Ar-condicionado 3', va: 1650, fase: 'A' },
+];
+
+function fmt(x, casas = 1) {
+  return x.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
+
+const $ = (id) => document.getElementById(id);
+const tela = $('tela'), ctx = tela.getContext('2d');
+let circ = CASA_EXEMPLO.map((c) => ({ ...c }));
+function listar() {
+  $('lista').innerHTML = circ.map((c, i) => `<tr><td>${c.nome}</td><td class="va">${fmt(c.va, 0)} VA</td>
+    <td><span class="fase">${FASES.map((f) => `<button data-i="${i}" data-f="${f}" class="${c.fase === f ? 'on' : ''}">${f}</button>`).join('')}</span></td>
+    <td><button data-del="${i}" title="Remover" style="width:30px;height:30px;padding:0">×</button></td></tr>`).join('');
+  $('lista').querySelectorAll('button[data-f]').forEach((b) => b.onclick = () => { circ[+b.dataset.i].fase = b.dataset.f; atualizar(); });
+  $('lista').querySelectorAll('button[data-del]').forEach((b) => b.onclick = () => { circ.splice(+b.dataset.del, 1); atualizar(); });
+}
+function atualizar() {
+  listar();
+  const t = totais(circ), I = correntes(t), r = razao(t);
+  const est = $('estado');
+  if (!isFinite(r)) { est.className = 'estado ruim'; est.textContent = 'Há fase sem carga nenhuma: distribua os circuitos.'; }
+  else if (dentroDoCriterio(t)) { est.className = 'estado ok'; est.textContent = `Razão maior/menor = ${fmt(r, 2)}: dentro dos 10 %.`; }
+  else { est.className = 'estado ruim'; est.textContent = `Razão maior/menor = ${fmt(r, 2)}: passa dos 10 %. Mude algum circuito de fase.`; }
+  desenhar(t, I);
+}
+function desenhar(t, I) {
+  const W = tela.width, H = tela.height, base = H - 60, topo = 40;
+  ctx.clearRect(0, 0, W, H);
+  const max = Math.max(1000, ...FASES.map((f) => t[f])) * 1.1;
+  const larg = 110, gap = (W - 3 * larg) / 4;
+  const total = t.A + t.B + t.C, media = total / 3;
+  FASES.forEach((f, k) => {
+    const x = gap + k * (larg + gap);
+    let y = base;
+    for (const c of circ.filter((c) => c.fase === f)) {
+      const hh = (c.va / max) * (base - topo);
+      ctx.fillStyle = c.va >= 3000 ? '#232852' : c.va >= 1500 ? '#293275' : '#7a88cc';
+      ctx.fillRect(x, y - hh, larg, hh - 1);
+      if (hh > 16) { ctx.fillStyle = '#fff'; ctx.font = '600 12px Barlow, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(c.nome.split(' ')[0], x + larg / 2, y - hh / 2 + 4); }
+      y -= hh;
+    }
+    ctx.fillStyle = '#232852'; ctx.font = '900 18px Barlow, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`Fase ${f}`, x + larg / 2, base + 22);
+    ctx.font = '600 14px Barlow, sans-serif'; ctx.fillStyle = '#333';
+    ctx.fillText(`${fmt(t[f], 0)} VA · ${fmt(I[f], 1)} A`, x + larg / 2, base + 42);
+  });
+  if (total > 0) {
+    const ym = base - (media / max) * (base - topo);
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = '#4a5bbf'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(10, ym); ctx.lineTo(W - 10, ym); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#4a5bbf'; ctx.font = '700 12px Barlow, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(`MÉDIA ${fmt(media, 0)} VA`, 12, ym - 6);
+  }
+  ctx.fillStyle = '#4a5bbf'; ctx.font = '700 12px Barlow, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(`TOTAL INSTALADO: ${fmt(total, 0)} VA`, 12, 20);
+}
+$('pEx').onclick = () => { circ = CASA_EXEMPLO.map((c) => ({ ...c })); atualizar(); };
+$('pExerc').onclick = () => { circ = CASA_EXERCICIO.map((c) => ({ ...c })); atualizar(); };
+$('pAuto').onclick = () => { if (circ.length) circ = melhorDistribuicao(circ); atualizar(); };
+$('nAdd').onclick = () => {
+  const va = +$('nVA').value; if (!(va > 0) || circ.length >= 12) return;
+  const t = totais(circ); const f = FASES.reduce((a, b) => (t[b] < t[a] ? b : a));
+  circ.push({ nome: $('nNome').value.trim() || `C${circ.length + 1}`, va, fase: f });
+  $('nNome').value = ''; $('nVA').value = ''; atualizar();
+};
+atualizar();
+</script>
+</body>
+</html>

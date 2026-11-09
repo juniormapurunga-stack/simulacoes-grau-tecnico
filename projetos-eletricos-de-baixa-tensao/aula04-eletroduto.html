@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ocupação de Eletroduto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --navy-dark:#232852; --navy-light:#293275; --acento:#4a5bbf; --off:#f3f3f3; --lav:#a0a8cc; --lav-med:#7a88cc;
+    --texto:#333; --suave:#666; --borda:#e0e0e0; --alerta:#e07a1f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--off); color:var(--texto); font-family:'Barlow','Trebuchet MS','Segoe UI',sans-serif; font-size:16px; line-height:1.5; }
+  header { background:var(--navy-dark); color:#fff; padding:20px 16px 18px; border-left:6px solid var(--acento); }
+  .eyebrow { font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--lav-med); }
+  h1 { margin:6px 0 4px; font-weight:900; font-size:clamp(24px,5vw,34px); line-height:1.1; }
+  header p { margin:0; color:var(--lav); font-weight:300; }
+  main { max-width:1100px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  @media (max-width:820px) { main { grid-template-columns:1fr; } }
+  .card { background:#fff; border-radius:6px; padding:16px; border-left:4px solid var(--navy-light); }
+  .card h2 { margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--acento); }
+  canvas { width:100%; height:auto; display:block; background:var(--off); border-radius:4px; }
+  .presets { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  button { font:inherit; font-weight:700; border-radius:4px; border:1px solid var(--navy-light); background:#fff; color:var(--navy-light); cursor:pointer; }
+  .presets button { font-size:13px; padding:6px 10px; }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  td { padding:4px; border-bottom:1px solid var(--borda); }
+  td.n { text-align:center; font-weight:700; width:40px; }
+  td button { width:34px; height:32px; padding:0; font-size:18px; }
+  .resultado { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .kpi { background:var(--navy-dark); color:#fff; border-radius:4px; padding:10px 12px; }
+  .kpi small { display:block; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--lav-med); font-weight:700; }
+  .kpi b { font-size:24px; font-weight:900; }
+  ol { margin:0; padding-left:20px; } li { margin-bottom:6px; }
+  footer { max-width:1100px; margin:0 auto; padding:8px 16px 24px; font-size:13px; color:var(--suave); }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Aula 04 · Projetos Elétricos de Baixa Tensão</div>
+  <h1>Ocupação de Eletroduto</h1>
+  <p>Some os cabos de um trecho e veja o menor eletroduto que respeita a taxa de ocupação da NBR 5410.</p>
+</header>
+<main>
+  <section class="card">
+    <h2>Corte do eletroduto</h2>
+    <canvas id="tela" width="520" height="520" aria-label="Corte do eletroduto com os cabos"></canvas>
+    <p id="rTxt" style="margin:10px 0 0"></p>
+  </section>
+  <section class="card">
+    <h2>Cabos no trecho (classe 5, 450/750 V)</h2>
+    <div class="presets"><button id="pDeck">6 × 4 mm² (deck)</button><button id="pEx">Exercício: 3 circuitos</button><button id="pZero">Limpar</button></div>
+    <table><tbody id="lista"></tbody></table>
+    <div class="resultado">
+      <div class="kpi"><small>Eletroduto</small><b id="rE"></b></div>
+      <div class="kpi"><small>Cabos / área útil</small><b id="rA"></b></div>
+    </div>
+  </section>
+  <section class="card" style="grid-column:1/-1">
+    <h2>Experimente</h2>
+    <ol>
+      <li>Clique em “6 × 4 mm²”: 75,4 mm² de cabos contra 114,0 mm² úteis do 3/4" (40 %).</li>
+      <li>Some cabos de 4 mm² um a um. Com quantos o eletroduto troca para 1"?</li>
+      <li>Deixe só 1 cabo e depois 2: a taxa muda para 53 % e 31 %. Por que 2 cabos têm a menor taxa?</li>
+      <li>Monte o exercício (3 circuitos) e veja quanto da área útil ainda sobra.</li>
+    </ol>
+  </section>
+</main>
+<footer>Curso Técnico em Eletrotécnica · Prof. Me. Francisco Mapurunga de Menezes Júnior · ABNT NBR 5410:2004, 6.2.11.1.6; diâmetros da “Calculadora Eletroduto - Classe 5 - 750V” (eletroduto pelo diâmetro nominal).</footer>
+<script>
+// Física da simulação "Ocupação de eletroduto" (Aula 04). ABNT NBR 5410:2004, 6.2.11.1.6.
+// Diâmetros da "Calculadora Eletroduto - Classe 5 - 750V.xlsx" do curso.
+
+const DIAMETRO_CABO = { 1.5: 2.9, 2.5: 3.5, 4: 4.0, 6: 4.6, 10: 6.0, 16: 7.0, 25: 9.0 };
+const ELETRODUTOS = [
+  ['3/4"', 19.05], ['1"', 25.4], ['1 1/4"', 31.75], ['1 1/2"', 38.1], ['2"', 50.8], ['3"', 76.2], ['4"', 101.6],
+];
+
+const areaCirculo = (d) => (Math.PI * d * d) / 4;
+
+/** Taxa máxima de ocupação pelo número de condutores. */
+function taxa(n) {
+  return n <= 1 ? 0.53 : n === 2 ? 0.31 : 0.4;
+}
+
+/** lista: [{secao, qtd}] → {n, area} */
+function cabos(lista) {
+  let n = 0, area = 0;
+  for (const { secao, qtd } of lista) {
+    if (!qtd) continue;
+    n += qtd; area += qtd * areaCirculo(DIAMETRO_CABO[secao]);
+  }
+  return { n, area };
+}
+
+/** Menor eletroduto que atende; null se nenhum. */
+function escolher(lista) {
+  const { n, area } = cabos(lista);
+  if (n === 0) return null;
+  const t = taxa(n);
+  for (const [nome, d] of ELETRODUTOS) {
+    const util = t * areaCirculo(d);
+    if (area <= util + 1e-9) return { nome, d, n, area, t, util, ocupacao: area / areaCirculo(d) };
+  }
+  return { nome: null, n, area, t };
+}
+
+function fmt(x, casas = 1) {
+  return x.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
+
+const $ = (id) => document.getElementById(id);
+const tela = $('tela'), ctx = tela.getContext('2d');
+const SECS = Object.keys(DIAMETRO_CABO).map(Number).sort((a, b) => a - b);
+let qtd = Object.fromEntries(SECS.map((s) => [s, 0]));
+function lista() { return SECS.map((s) => ({ secao: s, qtd: qtd[s] })); }
+function tabela() {
+  $('lista').innerHTML = SECS.map((s) => `<tr><td>${fmt(s, 1)} mm² <small style="color:#666">(Ø ${fmt(DIAMETRO_CABO[s], 1)} mm)</small></td>
+    <td><button data-s="${s}" data-d="-1" aria-label="menos">−</button></td><td class="n">${qtd[s]}</td><td><button data-s="${s}" data-d="1" aria-label="mais">+</button></td></tr>`).join('');
+  $('lista').querySelectorAll('button').forEach((b) => b.onclick = () => { const s = +b.dataset.s; qtd[s] = Math.max(0, Math.min(30, qtd[s] + +b.dataset.d)); atualizar(); });
+}
+function atualizar() {
+  tabela();
+  const r = escolher(lista());
+  if (!r) { $('rE').textContent = '—'; $('rA').textContent = '—'; $('rTxt').textContent = 'Some cabos ao trecho.'; desenhar(null); return; }
+  if (!r.nome) { $('rE').textContent = 'acima de 4"'; $('rA').textContent = fmt(r.area, 1) + ' mm²'; $('rTxt').textContent = 'Nenhum eletroduto da lista atende: use eletrocalha ou divida o trecho.'; desenhar(null); return; }
+  $('rE').textContent = r.nome;
+  $('rA').textContent = `${fmt(r.area, 1)} / ${fmt(r.util, 1)} mm²`;
+  $('rTxt').innerHTML = `${r.n} cabo(s) → taxa máxima de ${fmt(r.t * 100, 0)} %. Os cabos ocupam ${fmt(r.ocupacao * 100, 1)} % da área do ${r.nome} (Ø ${fmt(r.d, 2)} mm).`;
+  desenhar(r);
+}
+function desenhar(r) {
+  const W = tela.width, H = tela.height, cx = W / 2, cy = H / 2;
+  ctx.clearRect(0, 0, W, H);
+  if (!r) return;
+  const R = W * 0.42, esc = R / (r.d / 2);
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.fill();
+  ctx.strokeStyle = '#232852'; ctx.lineWidth = 6; ctx.stroke();
+  ctx.setLineDash([6, 5]); ctx.strokeStyle = '#4a5bbf'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy, R * Math.sqrt(r.t), 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+  // empacotamento simples: do maior para o menor, posições em espiral sem sobrepor
+  const cs = []; for (const s of [...SECS].reverse()) for (let k = 0; k < qtd[s]; k++) cs.push({ s, r: (DIAMETRO_CABO[s] / 2) * esc });
+  const pos = [];
+  const cores = { 1.5: '#7a88cc', 2.5: '#4a5bbf', 4: '#293275', 6: '#232852', 10: '#e07a1f', 16: '#b05a10', 25: '#6b3a0a' };
+  for (const c of cs) {
+    let ok = null;
+    for (let k = 0; k < 4000 && !ok; k++) {
+      const ang = k * 0.35, rad = Math.min(R - c.r - 4, 1.2 * Math.sqrt(k) * 3);
+      const x = cx + rad * Math.cos(ang), y = cy + rad * Math.sin(ang);
+      if (Math.hypot(x - cx, y - cy) + c.r > R - 3) continue;
+      if (pos.every((p) => Math.hypot(p.x - x, p.y - y) >= p.r + c.r)) ok = { x, y, r: c.r, s: c.s };
+    }
+    if (ok) pos.push(ok);
+  }
+  for (const p of pos) {
+    ctx.fillStyle = cores[p.s]; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = '#d9a46a'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.55, 0, 2 * Math.PI); ctx.fill();
+  }
+  ctx.fillStyle = '#4a5bbf'; ctx.font = '700 13px Barlow, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(`TRACEJADO: ÁREA ÚTIL DE ${fmt(r.t * 100, 0)} %`, cx, 22);
+}
+function preset(v) { qtd = Object.fromEntries(SECS.map((s) => [s, v[s] || 0])); atualizar(); }
+$('pDeck').onclick = () => preset({ 4: 6 });
+$('pEx').onclick = () => preset({ 1.5: 3, 2.5: 3, 6: 3 });
+$('pZero').onclick = () => preset({});
+preset({ 4: 6 });
+</script>
+</body>
+</html>
