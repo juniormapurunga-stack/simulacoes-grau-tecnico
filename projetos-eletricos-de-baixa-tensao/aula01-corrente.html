@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corrente Mono e Trifásica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy-dark:#232852; --navy-mid:#252e61; --navy-light:#293275; --acento:#4a5bbf;
+    --off:#f3f3f3; --lav:#a0a8cc; --lav-med:#7a88cc; --texto:#333; --suave:#666; --borda:#e0e0e0;
+    --alerta:#e07a1f;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--off); color:var(--texto);
+         font-family:'Barlow','Trebuchet MS','Segoe UI',sans-serif; font-size:16px; line-height:1.5; }
+  header { background:var(--navy-dark); color:#fff; padding:20px 16px 18px; border-left:6px solid var(--acento); }
+  .eyebrow { font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--lav-med); }
+  h1 { margin:6px 0 4px; font-weight:900; font-size:clamp(24px,5vw,34px); line-height:1.1; }
+  header p { margin:0; color:var(--lav); font-weight:300; }
+  main { max-width:1100px; margin:0 auto; padding:16px; display:grid; gap:16px;
+         grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); }
+  @media (max-width:820px) { main { grid-template-columns:1fr; } }
+  .card { background:#fff; border-radius:6px; padding:16px; border-left:4px solid var(--navy-light); }
+  .card h2 { margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--acento); }
+  canvas { width:100%; height:auto; display:block; background:var(--off); border-radius:4px; }
+  label { display:block; font-weight:600; margin-top:12px; }
+  label span { float:right; font-weight:700; color:var(--navy-light); }
+  input[type=range] { width:100%; height:32px; accent-color:var(--navy-light); }
+  .seg { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px; }
+  .seg button, .presets button { font:inherit; font-weight:700; padding:10px; border-radius:4px; border:2px solid var(--navy-light);
+         background:#fff; color:var(--navy-light); cursor:pointer; }
+  .seg button.on { background:var(--navy-light); color:#fff; }
+  .presets { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .presets button { font-size:13px; padding:6px 10px; border-width:1px; }
+  select { font:inherit; width:100%; padding:8px; margin-top:6px; border:1px solid var(--borda); border-radius:4px; }
+  .resultado { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .kpi { background:var(--navy-dark); color:#fff; border-radius:4px; padding:10px 12px; }
+  .kpi small { display:block; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--lav-med); font-weight:700; }
+  .kpi b { font-size:28px; font-weight:900; }
+  .formula { border:1px solid var(--acento); border-radius:4px; padding:10px; text-align:center; font-size:20px; margin-top:12px; }
+  .aviso { margin-top:10px; padding:8px 10px; border-radius:4px; background:#fff4e8; color:#7a3d00;
+           border-left:4px solid var(--alerta); display:none; }
+  ol { margin:0; padding-left:20px; } li { margin-bottom:6px; }
+  footer { max-width:1100px; margin:0 auto; padding:8px 16px 24px; font-size:13px; color:var(--suave); }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Aula 01 · Projetos Elétricos de Baixa Tensão</div>
+  <h1>Corrente Mono e Trifásica</h1>
+  <p>Escolha a carga, a tensão e o fator de potência e veja a corrente que o cabo e o disjuntor vão enfrentar.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>O que o cabo enxerga</h2>
+    <canvas id="tela" width="640" height="360" aria-label="Barra da corrente comparada com a potência"></canvas>
+  </section>
+
+  <section class="card">
+    <h2>Controles</h2>
+    <div class="seg">
+      <button id="bMono" class="on">Monofásico</button>
+      <button id="bTri">Trifásico</button>
+    </div>
+    <div class="presets" id="presets"></div>
+    <label>Potência ativa P <span id="vP"></span><input id="P" type="range" min="100" max="20000" step="100" value="5500"></label>
+    <label>Tensão <select id="V"></select></label>
+    <label>Fator de potência FP <span id="vFP"></span><input id="FP" type="range" min="0.3" max="1" step="0.01" value="1"></label>
+    <div class="formula" id="formula">I = P / (V · FP)</div>
+    <div class="resultado">
+      <div class="kpi"><small>Corrente</small><b id="rI"></b></div>
+      <div class="kpi"><small>Potência aparente</small><b id="rS"></b></div>
+    </div>
+    <div class="aviso" id="aviso"></div>
+  </section>
+
+  <section class="card" style="grid-column:1/-1">
+    <h2>Experimente</h2>
+    <ol>
+      <li>Com o chuveiro (5500 W, 220 V, FP 1), confira os 25 A do exemplo do slide.</li>
+      <li>Troque a tensão para 127 V. A potência é a mesma, mas a corrente sobe para 43,3 A.</li>
+      <li>Clique em “Trifásico”, escolha o motor de 10 kW e confira 17,9 A por fase em 380 V.</li>
+      <li>Baixe o FP do motor de 0,85 para 0,50. A potência ativa não mudou: o que aconteceu com a corrente?</li>
+    </ol>
+  </section>
+</main>
+<footer>Curso Técnico em Eletrotécnica · Prof. Me. Francisco Mapurunga de Menezes Júnior · Fórmulas da NBR 5410 e do deck <i>Curso: Projetos Elétricos</i></footer>
+
+<script>
+// Física da simulação "Corrente mono e trifásica" (Aula 01).
+// Só funções puras: o teste importa daqui e o build embute no HTML.
+
+/** S = P / FP  (W) → VA */
+function potenciaAparente(P, FP) {
+  return P / FP;
+}
+
+/** I = P / (V · FP)  (W, V) → A */
+function correnteMono(P, V, FP) {
+  return P / (V * FP);
+}
+
+/** I_L = P / (√3 · V_L · FP)  (W, V) → A */
+function correnteTri(P, VL, FP) {
+  return P / (Math.sqrt(3) * VL * FP);
+}
+
+/** Corrente conforme o tipo de ligação ('mono' ou 'tri'). */
+function corrente(tipo, P, V, FP) {
+  return tipo === 'tri' ? correnteTri(P, V, FP) : correnteMono(P, V, FP);
+}
+
+/** Formata número em pt-BR com casas decimais fixas. */
+function fmt(x, casas = 1) {
+  return x.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
+
+const $ = (id) => document.getElementById(id);
+const tela = $('tela'), ctx = tela.getContext('2d');
+let tipo = 'mono';
+const TENSOES = { mono: [127, 220], tri: [220, 380] };
+const PRESETS = {
+  mono: [['Chuveiro', 5500, 220, 1], ['Ar-condicionado', 2200, 220, 0.9], ['Micro-ondas', 1500, 220, 0.95]],
+  tri: [['Motor 10 kW', 10000, 380, 0.85], ['Forno 9 kW', 9000, 380, 1], ['Motor 7,5 kW', 7500, 380, 0.82]],
+};
+
+function montarTipo(t, manterV) {
+  tipo = t;
+  $('bMono').classList.toggle('on', t === 'mono');
+  $('bTri').classList.toggle('on', t === 'tri');
+  const sel = $('V'), atual = +sel.value;
+  sel.innerHTML = TENSOES[t].map((v) => `<option value="${v}">${v} V${t === 'mono' ? ' (fase-neutro ou fase-fase)' : ' (entre fases)'}</option>`).join('');
+  sel.value = manterV && TENSOES[t].includes(atual) ? atual : TENSOES[t][1];
+  $('presets').innerHTML = PRESETS[t].map((p, i) => `<button data-i="${i}">${p[0]}</button>`).join('');
+  $('presets').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    const [, P, V, FP] = PRESETS[tipo][+b.dataset.i];
+    $('P').value = P; $('V').value = V; $('FP').value = FP; atualizar();
+  }));
+  $('formula').textContent = t === 'mono' ? 'I = P / (V · FP)' : 'I = P / (√3 · V · FP)';
+  atualizar();
+}
+
+function atualizar() {
+  const P = +$('P').value, V = +$('V').value, FP = +$('FP').value;
+  $('vP').textContent = fmt(P, 0) + ' W';
+  $('vFP').textContent = fmt(FP, 2);
+  const I = corrente(tipo, P, V, FP), S = potenciaAparente(P, FP);
+  const I1 = corrente(tipo, P, V, 1);
+  $('rI').textContent = fmt(I) + ' A' + (tipo === 'tri' ? '/fase' : '');
+  $('rS').textContent = fmt(S, 0) + ' VA';
+  const av = $('aviso');
+  if (FP < 0.8) { av.style.display = 'block'; av.textContent = `FP baixo: a mesma potência ativa puxa ${fmt(I / I1, 2)} vezes a corrente de FP = 1. O cabo esquenta com essa corrente.`; }
+  else if (tipo === 'mono' && V === 127 && P > 4400) { av.style.display = 'block'; av.textContent = 'Em 127 V, cargas grandes como chuveiro puxam muita corrente. Por isso no Ceará se usa 220 V entre fase e neutro.'; }
+  else av.style.display = 'none';
+  desenhar(P, I, I1, S);
+}
+
+function barra(y, valor, max, cor, rotulo, texto) {
+  const W = tela.width, x0 = 150, larg = W - x0 - 30;
+  ctx.fillStyle = '#e0e0e0'; ctx.fillRect(x0, y, larg, 34);
+  ctx.fillStyle = cor; ctx.fillRect(x0, y, Math.min(1, valor / max) * larg, 34);
+  ctx.fillStyle = '#232852'; ctx.font = '600 16px Barlow, sans-serif'; ctx.textAlign = 'right';
+  ctx.fillText(rotulo, x0 - 10, y + 23);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '700 16px Barlow, sans-serif';
+  ctx.fillText(texto, x0 + 8, y + 23);
+}
+
+function desenhar(P, I, I1, S) {
+  const W = tela.width, H = tela.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#4a5bbf'; ctx.font = '700 12px Barlow, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('ESCALA FIXA: 0 A 100 A E 0 A 25 kVA', 20, 28);
+  barra(60, P, 25000, '#7a88cc', 'P (W)', fmt(P, 0) + ' W');
+  barra(110, S, 25000, '#4a5bbf', 'S (VA)', fmt(S, 0) + ' VA');
+  barra(180, I1, 100, '#293275', 'I com FP = 1', fmt(I1) + ' A');
+  barra(230, I, 100, I > I1 * 1.25 ? '#e07a1f' : '#232852', 'I real', fmt(I) + ' A');
+  // fios: espessura ilustrativa proporcional à corrente
+  const n = tipo === 'tri' ? 3 : 1;
+  for (let k = 0; k < n; k++) {
+    const y = 300 + k * 18 - (n - 1) * 9;
+    ctx.strokeStyle = I > 40 ? '#e07a1f' : '#232852';
+    ctx.lineWidth = Math.max(2, Math.min(14, I / 5));
+    ctx.beginPath(); ctx.moveTo(150, y); ctx.lineTo(W - 30, y); ctx.stroke();
+  }
+  ctx.fillStyle = '#666'; ctx.font = '400 13px Barlow, sans-serif'; ctx.textAlign = 'right';
+  ctx.fillText(tipo === 'tri' ? '3 fases' : 'fase', 140, 305);
+}
+
+$('bMono').addEventListener('click', () => montarTipo('mono'));
+$('bTri').addEventListener('click', () => montarTipo('tri'));
+['P', 'FP', 'V'].forEach((id) => $(id).addEventListener('input', atualizar));
+montarTipo('mono');
+</script>
+</body>
+</html>

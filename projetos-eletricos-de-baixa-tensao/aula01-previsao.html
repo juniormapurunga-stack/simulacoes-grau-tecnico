@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Previsão de Carga por Cômodo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy-dark:#232852; --navy-mid:#252e61; --navy-light:#293275; --acento:#4a5bbf;
+    --off:#f3f3f3; --lav:#a0a8cc; --lav-med:#7a88cc; --texto:#333; --suave:#666; --borda:#e0e0e0;
+    --alerta:#e07a1f;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--off); color:var(--texto);
+         font-family:'Barlow','Trebuchet MS','Segoe UI',sans-serif; font-size:16px; line-height:1.5; }
+  header { background:var(--navy-dark); color:#fff; padding:20px 16px 18px; border-left:6px solid var(--acento); }
+  .eyebrow { font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--lav-med); }
+  h1 { margin:6px 0 4px; font-weight:900; font-size:clamp(24px,5vw,34px); line-height:1.1; }
+  header p { margin:0; color:var(--lav); font-weight:300; }
+  main { max-width:1100px; margin:0 auto; padding:16px; display:grid; gap:16px;
+         grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); }
+  @media (max-width:820px) { main { grid-template-columns:1fr; } }
+  .card { background:#fff; border-radius:6px; padding:16px; border-left:4px solid var(--navy-light); }
+  .card h2 { margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--acento); }
+  canvas { width:100%; height:auto; display:block; background:var(--off); border-radius:4px; }
+  label { display:block; font-weight:600; margin-top:12px; }
+  label span { float:right; font-weight:700; color:var(--navy-light); }
+  input[type=range] { width:100%; height:32px; accent-color:var(--navy-light); }
+  select { font:inherit; width:100%; padding:8px; margin-top:6px; border:1px solid var(--borda); border-radius:4px; }
+  button { font:inherit; font-weight:700; padding:10px 14px; border-radius:4px; border:2px solid var(--navy-light);
+           background:var(--navy-light); color:#fff; cursor:pointer; margin-top:12px; }
+  button.sec { background:#fff; color:var(--navy-light); }
+  .resultado { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .kpi { background:var(--navy-dark); color:#fff; border-radius:4px; padding:10px 12px; }
+  .kpi small { display:block; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--lav-med); font-weight:700; }
+  .kpi b { font-size:24px; font-weight:900; }
+  .conta { font-size:14px; color:var(--suave); margin-top:10px; }
+  .aviso { margin-top:10px; padding:8px 10px; border-radius:4px; background:#fff4e8; color:#7a3d00;
+           border-left:4px solid var(--alerta); display:none; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { padding:6px 4px; border-bottom:1px solid var(--borda); text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  tfoot td { font-weight:700; color:var(--navy-light); border-top:2px solid var(--navy-light); }
+  td button { margin:0; padding:2px 8px; font-size:12px; }
+  ol { margin:0; padding-left:20px; } li { margin-bottom:6px; }
+  footer { max-width:1100px; margin:0 auto; padding:8px 16px 24px; font-size:13px; color:var(--suave); }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Aula 01 · Projetos Elétricos de Baixa Tensão</div>
+  <h1>Previsão de Carga por Cômodo</h1>
+  <p>NBR 5410, item 9.5.2: carga mínima de iluminação e tomadas de uso geral de uma habitação.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Planta do cômodo</h2>
+    <canvas id="tela" width="640" height="400" aria-label="Planta do cômodo com tomadas distribuídas no perímetro"></canvas>
+  </section>
+
+  <section class="card">
+    <h2>Cômodo</h2>
+    <label>Tipo <select id="tipo"></select></label>
+    <label>Comprimento <span id="vC"></span><input id="C" type="range" min="1" max="8" step="0.5" value="4"></label>
+    <label>Largura <span id="vL"></span><input id="L" type="range" min="1" max="8" step="0.5" value="4"></label>
+    <div class="resultado">
+      <div class="kpi"><small>Iluminação</small><b id="rIl"></b></div>
+      <div class="kpi"><small>Tomadas (TUG)</small><b id="rTug"></b></div>
+    </div>
+    <div class="conta" id="conta"></div>
+    <div class="aviso" id="aviso"></div>
+    <button id="add">Adicionar à casa</button>
+  </section>
+
+  <section class="card" style="grid-column:1/-1">
+    <h2>Quadro da casa</h2>
+    <table>
+      <thead><tr><th>Cômodo</th><th>Área (m²)</th><th>Perímetro (m)</th><th>Iluminação (VA)</th><th>TUG</th><th>TUG (VA)</th><th></th></tr></thead>
+      <tbody id="linhas"></tbody>
+      <tfoot><tr><td colspan="3">Total</td><td id="tIl">0</td><td></td><td id="tTug">0</td><td></td></tr></tfoot>
+    </table>
+    <label>Tomadas de uso específico, TUE (chuveiro, ar etc.) <span id="vTue"></span><input id="tue" type="range" min="0" max="20000" step="100" value="0"></label>
+    <div class="resultado" style="grid-template-columns:1fr">
+      <div class="kpi"><small>Potência instalada</small><b id="tTot">0 VA</b></div>
+    </div>
+    <div class="aviso" id="avisoCasa"></div>
+    <button class="sec" id="exemplo">Carregar a casa do exemplo do slide</button>
+  </section>
+
+  <section class="card" style="grid-column:1/-1">
+    <h2>Experimente</h2>
+    <ol>
+      <li>Escolha “Sala”, 4 m × 4 m, e confira: 220 VA de iluminação e 4 tomadas de 100 VA.</li>
+      <li>Aumente o comprimento de meio em meio metro. Em que área a iluminação sobe mais 60 VA?</li>
+      <li>Troque para “Cozinha” com as mesmas medidas. Por que o número de tomadas e a potência mudam?</li>
+      <li>Clique em “Carregar a casa do exemplo” e confira 580 VA + 3200 VA = 3780 VA. Depois some um chuveiro de 5500 W nas TUE.</li>
+    </ol>
+  </section>
+</main>
+<footer>Curso Técnico em Eletrotécnica · Prof. Me. Francisco Mapurunga de Menezes Júnior · ABNT NBR 5410:2004, 9.5.2</footer>
+
+<script>
+// Física da simulação "Previsão de carga por cômodo" (Aula 01), NBR 5410:2004, 9.5.2.
+
+/** Tipos de cômodo: regra de quantidade de TUG e se é área molhada (600 VA). */
+const TIPOS = {
+  sala:       { nome: 'Sala',               passo: 5,    molhada: false },
+  dormitorio: { nome: 'Dormitório',         passo: 5,    molhada: false },
+  cozinha:    { nome: 'Cozinha / copa',     passo: 3.5,  molhada: true },
+  servico:    { nome: 'Área de serviço',    passo: 3.5,  molhada: true },
+  banheiro:   { nome: 'Banheiro',           passo: null, molhada: true },
+  varanda:    { nome: 'Varanda',            passo: null, molhada: false },
+  outro:      { nome: 'Outro cômodo',       passo: 5,    molhada: false },
+};
+
+/** 9.5.2.1.2: 100 VA até 6 m²; acima, +60 VA a cada 4 m² inteiros. */
+function cargaIluminacao(area) {
+  if (area <= 6) return 100;
+  return 100 + 60 * Math.floor((area - 6) / 4 + 1e-9);
+}
+
+/** 9.5.2.2.1: número mínimo de tomadas de uso geral. */
+function numeroTUG(tipo, area, perimetro) {
+  const t = TIPOS[tipo];
+  if (tipo === 'banheiro' || tipo === 'varanda') return 1;
+  if (tipo === 'outro' && area <= 6) return 1;
+  return Math.ceil(perimetro / t.passo - 1e-9);
+}
+
+/** 9.5.2.2.2: potência das TUG do cômodo (VA). Molhada: 600 VA até `n600` pontos, 100 VA nos demais. */
+function potenciaTUG(tipo, n, n600 = 3) {
+  if (!TIPOS[tipo].molhada) return 100 * n;
+  const altos = Math.min(n, n600);
+  return 600 * altos + 100 * (n - altos);
+}
+
+/** Previsão de um cômodo retangular c × l (m). */
+function previsaoComodo(tipo, c, l) {
+  const area = c * l, perimetro = 2 * (c + l);
+  const ilum = cargaIluminacao(area);
+  const nTUG = numeroTUG(tipo, area, perimetro);
+  const pTUG = potenciaTUG(tipo, nTUG);
+  return { tipo, area, perimetro, ilum, nTUG, pTUG, total: ilum + pTUG };
+}
+
+/** Soma da casa: lista de previsões + TUE (VA). */
+function totalCasa(comodos, tue = 0) {
+  const ilum = comodos.reduce((s, c) => s + c.ilum, 0);
+  const tug = comodos.reduce((s, c) => s + c.pTUG, 0);
+  const molhadas = comodos.filter((c) => TIPOS[c.tipo].molhada).reduce((s, c) => s + c.nTUG, 0);
+  return { ilum, tug, tue, total: ilum + tug + tue, molhadasAcimaDe6: molhadas > 6 };
+}
+
+/** Formata número em pt-BR. */
+function fmt(x, casas = 0) {
+  return x.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
+
+const $ = (id) => document.getElementById(id);
+const tela = $('tela'), ctx = tela.getContext('2d');
+let casa = [];
+$('tipo').innerHTML = Object.entries(TIPOS).map(([k, t]) => `<option value="${k}">${t.nome}</option>`).join('');
+
+function atual() {
+  return previsaoComodo($('tipo').value, +$('C').value, +$('L').value);
+}
+
+function atualizar() {
+  const r = atual(), t = TIPOS[r.tipo];
+  $('vC').textContent = fmt(+$('C').value, 1) + ' m';
+  $('vL').textContent = fmt(+$('L').value, 1) + ' m';
+  $('rIl').textContent = fmt(r.ilum) + ' VA';
+  $('rTug').textContent = `${r.nTUG} tomada${r.nTUG > 1 ? 's' : ''}, ${fmt(r.pTUG)} VA`;
+  const blocos = r.area > 6 ? Math.floor((r.area - 6) / 4 + 1e-9) : 0;
+  let txt = `Área ${fmt(r.area, 2)} m²: ` + (r.area <= 6 ? 'até 6 m² → 100 VA.' : `${fmt(r.area - 6, 2)} m² acima de 6 → ${blocos} bloco(s) de 4 m² inteiros → 100 + ${blocos} × 60 = ${r.ilum} VA.`);
+  if (t.passo && !(r.tipo === 'outro' && r.area <= 6)) txt += ` Perímetro ${fmt(r.perimetro, 1)} m ÷ ${fmt(t.passo, 1)} = ${fmt(r.perimetro / t.passo, 2)} → ${r.nTUG} tomada(s).`;
+  else txt += ` ${t.nome}: mínimo de 1 tomada.`;
+  txt += t.molhada ? ' Área molhada: 600 VA nas 3 primeiras, 100 VA nas demais.' : ' 100 VA por tomada.';
+  $('conta').textContent = txt;
+  const av = $('aviso');
+  if (r.tipo === 'banheiro') { av.style.display = 'block'; av.textContent = 'O chuveiro não entra aqui: ele é TUE e é ligado direto, sem tomada (9.5.2.3).'; }
+  else if (r.tipo === 'sala') { av.style.display = 'block'; av.textContent = 'Este é o mínimo. A norma recomenda mais tomadas na sala de estar, que costuma alimentar vários aparelhos.'; }
+  else av.style.display = 'none';
+  desenhar(r);
+}
+
+function desenhar(r) {
+  const W = tela.width, H = tela.height, m = 50;
+  ctx.clearRect(0, 0, W, H);
+  const c = +$('C').value, l = +$('L').value;
+  const esc = Math.min((W - 2 * m) / c, (H - 2 * m) / l);
+  const w = c * esc, h = l * esc, x0 = (W - w) / 2, y0 = (H - h) / 2;
+  // grade de 1 m
+  ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+  for (let i = 1; i < c; i++) { ctx.beginPath(); ctx.moveTo(x0 + i * esc, y0); ctx.lineTo(x0 + i * esc, y0 + h); ctx.stroke(); }
+  for (let j = 1; j < l; j++) { ctx.beginPath(); ctx.moveTo(x0, y0 + j * esc); ctx.lineTo(x0 + w, y0 + j * esc); ctx.stroke(); }
+  // paredes
+  ctx.strokeStyle = '#232852'; ctx.lineWidth = 8; ctx.strokeRect(x0, y0, w, h);
+  // ponto de luz no teto (NBR 5444: círculo)
+  ctx.strokeStyle = '#293275'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(x0 + w / 2, y0 + h / 2, 16, 0, 2 * Math.PI); ctx.stroke();
+  ctx.fillStyle = '#293275'; ctx.font = '700 14px Barlow, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(r.ilum + ' VA', x0 + w / 2, y0 + h / 2 + 38);
+  // tomadas distribuídas ao longo do perímetro
+  const per = 2 * (w + h), n = r.nTUG;
+  for (let k = 0; k < n; k++) {
+    let d = (k + 0.5) * per / n, x, y;
+    if (d < w) { x = x0 + d; y = y0; } else if ((d -= w) < h) { x = x0 + w; y = y0 + d; }
+    else if ((d -= h) < w) { x = x0 + w - d; y = y0 + h; } else { d -= w; x = x0; y = y0 + h - d; }
+    const alta = TIPOS[r.tipo].molhada && k < 3;
+    ctx.fillStyle = alta ? '#e07a1f' : '#4a5bbf';
+    ctx.beginPath(); ctx.moveTo(x, y - 11); ctx.lineTo(x + 11, y + 9); ctx.lineTo(x - 11, y + 9); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#666'; ctx.font = '400 13px Barlow, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(`${fmt(c, 1)} m × ${fmt(l, 1)} m · grade de 1 m`, 12, H - 12);
+  ctx.textAlign = 'right';
+  ctx.fillText(TIPOS[r.tipo].molhada ? 'laranja: 600 VA · azul: 100 VA' : 'azul: 100 VA', W - 12, H - 12);
+}
+
+function renderCasa() {
+  $('linhas').innerHTML = casa.map((r, i) => `<tr><td>${TIPOS[r.tipo].nome}</td><td>${fmt(r.area, 2)}</td><td>${fmt(r.perimetro, 1)}</td><td>${fmt(r.ilum)}</td><td>${r.nTUG}</td><td>${fmt(r.pTUG)}</td><td><button class="sec" data-i="${i}">×</button></td></tr>`).join('');
+  $('linhas').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { casa.splice(+b.dataset.i, 1); renderCasa(); }));
+  const tue = +$('tue').value, t = totalCasa(casa, tue);
+  $('vTue').textContent = fmt(tue) + ' VA';
+  $('tIl').textContent = fmt(t.ilum); $('tTug').textContent = fmt(t.tug);
+  $('tTot').textContent = `${fmt(t.ilum)} + ${fmt(t.tug)} + ${fmt(tue)} = ${fmt(t.total)} VA`;
+  const av = $('avisoCasa');
+  av.style.display = t.molhadasAcimaDe6 ? 'block' : 'none';
+  av.textContent = 'Mais de 6 tomadas no conjunto das áreas molhadas: a norma admite 600 VA só nas 2 primeiras de cada ambiente (9.5.2.2.2 a). Aqui o cálculo continua com 3, que é o lado da segurança.';
+}
+
+$('add').addEventListener('click', () => { casa.push(atual()); renderCasa(); });
+$('exemplo').addEventListener('click', () => {
+  casa = [previsaoComodo('sala', 4, 4), previsaoComodo('dormitorio', 3, 4), previsaoComodo('cozinha', 3, 3), previsaoComodo('banheiro', 2, 2)];
+  renderCasa();
+});
+['tipo', 'C', 'L'].forEach((id) => $(id).addEventListener('input', atualizar));
+$('tue').addEventListener('input', renderCasa);
+atualizar(); renderCasa();
+</script>
+</body>
+</html>
